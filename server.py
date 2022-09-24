@@ -1,5 +1,8 @@
 #  coding: utf-8 
+from socket import socket
 import socketserver
+import os
+from sys import path
 
 # Copyright 2013 Abram Hindle, Eddie Antonio Santos
 # 
@@ -30,9 +33,64 @@ import socketserver
 class MyWebServer(socketserver.BaseRequestHandler):
     
     def handle(self):
+        # Init key global variables
         self.data = self.request.recv(1024).strip()
-        print ("Got a request of: %s\n" % self.data)
-        self.request.sendall(bytearray("OK",'utf-8'))
+        method, orgRequested, httpV = self.getRequestPath(self.data)
+
+        if method != "GET":
+            self.request.send("HTTP/1.0 405\n".encode())
+            return
+
+        pathRequested = os.path.normpath(orgRequested)[1:]
+        pathRequested = os.path.join(os.getcwd(), "www", pathRequested)
+
+        redirectHeader = ""
+
+        if (os.path.isdir(pathRequested) and pathRequested[-1] != "/"):
+            pathRequested += "/"
+            redirectHeader = "Content-Location: " + orgRequested + "/\n"
+
+        
+        # Default to index.html if passed in an directory
+        if (os.path.isdir(pathRequested)):
+            pathRequested = os.path.join(pathRequested, "index.html")
+
+        # Return file
+        if (os.path.exists(pathRequested)):
+            _, ext = os.path.splitext(pathRequested)
+            data = ""
+            with open(pathRequested, "r") as f:
+                data += f.read()
+            h = self.getHeaders(200, ext[1:], len(data)) + redirectHeader
+            
+            self.request.send(h.encode())
+            self.request.send("\n".encode())
+            self.request.send(data.encode())
+
+        else:
+            
+            h = "HTTP/1.0 404 FILE NOT FOUND\n"
+            self.request.send(h.encode())
+
+
+    def getRequestPath(self, data):
+        data = data.decode("utf-8")
+        return data.split("\r\n")[0].split(" ")
+
+    def addStatusCode(self, code):
+        return "HTTP/1.0 " + str(code) + "\n"
+
+    def addFileType(self, ftype):
+        return "Content-Type: text/" + ftype + "; encoding=utf8\n"
+
+    def getHeaders(self, statusCode, ftype, l):
+        h = ""
+        h += self.addStatusCode(statusCode)
+        h += self.addFileType(ftype)
+        h += "Content-Length: " + str(l) + "\n"
+        return h
+
+
 
 if __name__ == "__main__":
     HOST, PORT = "localhost", 8080
