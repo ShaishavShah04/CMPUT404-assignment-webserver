@@ -36,19 +36,21 @@ class MyWebServer(socketserver.BaseRequestHandler):
         # Init key global variables
         self.data = self.request.recv(1024).strip()
         method, orgRequested, httpV = self.getRequestPath(self.data)
-
+        orgRequested = orgRequested[1:]
         if method != "GET":
             self.request.send("HTTP/1.0 405\n".encode())
             return
 
-        pathRequested = os.path.normpath(orgRequested)[1:]
+        pathRequested = os.path.normpath(orgRequested)
         pathRequested = os.path.join(os.getcwd(), "www", pathRequested)
 
-        redirectHeader = ""
 
-        if (os.path.isdir(pathRequested) and pathRequested[-1] != "/"):
-            pathRequested += "/"
-            redirectHeader = "Content-Location: " + orgRequested + "/\n"
+
+        if (os.path.isdir(pathRequested) and len(orgRequested) > 0 and orgRequested[-1] != "/"):
+            h = self.addStatusCode(301)
+            h += "Location: http://127.0.0.1:8080/" + orgRequested + "/\n"
+            self.request.send(h.encode())
+            return
 
         
         # Default to index.html if passed in an directory
@@ -61,7 +63,7 @@ class MyWebServer(socketserver.BaseRequestHandler):
             data = ""
             with open(pathRequested, "r") as f:
                 data += f.read()
-            h = self.getHeaders(200, ext[1:], len(data)) + redirectHeader
+            h = self.getHeaders(200, ext[1:], len(data))
             
             self.request.send(h.encode())
             self.request.send("\n".encode())
