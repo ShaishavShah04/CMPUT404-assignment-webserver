@@ -57,6 +57,16 @@ class MyWebServer(socketserver.BaseRequestHandler):
         if (os.path.isdir(pathRequested)):
             pathRequested = os.path.join(pathRequested, "index.html")
 
+        # Check that the user isn't exiting the www folder
+        normalizedPath = os.path.normpath(pathRequested)
+        pathToWWW = os.path.join(os.getcwd(),"www")
+
+        if (os.path.commonpath([normalizedPath, pathToWWW]) != pathToWWW):
+            # Return 404
+            h = "HTTP/1.0 404 FILE NOT FOUND\n"
+            self.request.send(h.encode())
+            return
+
         # Return file
         if (os.path.exists(pathRequested)):
             _, ext = os.path.splitext(pathRequested)
